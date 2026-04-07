@@ -1,3 +1,5 @@
+import logging
+
 import cv2
 
 
@@ -20,7 +22,7 @@ class Camera:
         """Öffnet den Kamera-Stream. Gibt True zurück wenn erfolgreich."""
         self.cap = cv2.VideoCapture(self.source)
         if not self.cap.isOpened():
-            print(f"[Camera] Fehler: Kamera {self.source} konnte nicht geöffnet werden.")
+            logging.error(f"[Camera] Fehler: Kamera {self.source} konnte nicht geöffnet werden.")
             return False
 
         self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30.0

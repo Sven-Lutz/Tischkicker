@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
-
+import logging
+logging.basicConfig(level=logging.INFO)
 from camera.Camera import Camera
 from ball_tracker.BallTracker import BallTracker
 from table.Field import Field
@@ -43,10 +44,10 @@ class GameController:
 
     def start(self) -> None:
         """Startet das System: Kamera öffnen → kalibrieren → Spiel-Loop."""
-        print("[game_controller] Starte System …")
+        logging.info("[game_controller] Starte System …")
 
         if not self.camera.start():
-            print("[game_controller] Abbruch: Kamera nicht verfügbar.")
+            logging.error("[game_controller] Abbruch: Kamera nicht verfügbar.")
             return
 
         self.ball_tracker.fps = self.camera.fps
@@ -66,20 +67,22 @@ class GameController:
         self.state = self.STATE_CALIBRATING
 
         # 1. HSV-Kalibrierung
-        print(
+        logging.info(
             "[game_controller] HSV-Kalibrierung – Passe die Trackbars an, bis nur der Ball sichtbar ist. Drücke 'q' zum Fortfahren.")
         self.ball_tracker.calibrate_hsv_interactive(self.camera)
 
         # 2. Tor-Kalibrierung
-        print("[game_controller] Tor-Kalibrierung – Bitte Tore markieren.")
+        logging.info("[game_controller] Tor-Kalibrierung – Bitte Tore markieren.")
         ok, frame = self.camera.read_frame()
         if not ok:
-            print("[game_controller] Kein Frame für Kalibrierung.")
+            logging.error("[game_controller] Kein Frame für Kalibrierung.")
             return
 
         self.field.calibrate_interactive(frame, window_name=self.WINDOW_NAME)
+        # 3. Wand-Kalibrierung
+
         self.state = self.STATE_RUNNING
-        print("[game_controller] Kalibrierung fertig – Spiel startet!")
+        logging.info("[game_controller] Kalibrierung fertig – Spiel startet!")
 
     def _run_game_loop(self) -> None:
         """Haupt-Loop: Frame lesen → tracken → prüfen → anzeigen."""
@@ -88,7 +91,7 @@ class GameController:
         while self.state in (self.STATE_RUNNING, self.STATE_PAUSED):
             ok, frame = self.camera.read_frame()
             if not ok:
-                print("[game_controller] Kein Frame mehr – Loop beendet.")
+                logging.error("[game_controller] Kein Frame mehr – Loop beendet.")
                 break
 
             if self.state == self.STATE_RUNNING:
@@ -108,21 +111,38 @@ class GameController:
         # 2. Geschwindigkeit aufzeichnen
         self.statistics.record_speed(self.ball_tracker.speed_cm_s)
 
-        # 3. Torzonen zeichnen
+        # 3. Trajektorie aufzeichnen
+        if ball_pos is not None:
+            self.statistics.trajectory_add(ball_pos)
+        
+        # 4. Torzonen zeichnen
         self.field.draw(frame)
+        
+        # 5. Trajektorie zeichnen
+        self.draw_trajectory(frame)
 
-        # 4. Tor-Check
+        # 6. Tor-Check
         scored_goals = self.field.check_goals(ball_pos)
         for goal_name in scored_goals:
             self.scoreboard.register_goal(goal_name, self.ball_tracker.speed_cm_s)
             self._on_goal(goal_name)
 
-        # 5. Spielende prüfen
+        # 7. Spielende prüfen
         for team in self.scoreboard.team_names:
             if self.scoreboard.get_score(team) >= self.goals_to_win:
                 self._on_game_over(team)
                 return
-
+    def draw_trajectory(self, frame):
+        """Zeichnet die Trajektorie der letzten 5 Sekunden."""
+        trajectory = self.statistics.get_trajectory_count()
+        if len(trajectory) < 2:
+            return
+        
+        for i in range(1, len(trajectory)):
+            # Extrahiere nur x,y position
+            p1 = (int(trajectory[i-1][0]), int(trajectory[i-1][1]))
+            p2 = (int(trajectory[i][0]), int(trajectory[i][1]))
+            cv2.line(frame, p1, p2, (255, 0, 0), 2)
     # ------------------------------------------------------------------
     # Event-Handler
     # ------------------------------------------------------------------

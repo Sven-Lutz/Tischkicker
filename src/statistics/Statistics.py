@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+import time
 
 
 @dataclass
@@ -59,9 +60,6 @@ class ScoreBoard:
         return list(self._goal_events)
 
 
-
-
-
 class Statistics:
     """
     Sammelt und berechnet Spielstatistiken.
@@ -71,6 +69,8 @@ class Statistics:
         self._speed_samples: list[float] = []  # cm/s, alle Frames
         self._max_speed: float = 0.0
         self._frame_count: int = 0
+        self.positions = [] #für die Trajektorie
+        self.window_seconds: int = 5
 
     def record_speed(self, speed_cm_s: float) -> None:
         """Nimmt eine Geschwindigkeits-Messung auf."""
@@ -90,6 +90,21 @@ class Statistics:
     def max_speed(self) -> float:
         """Maximale gemessene Geschwindigkeit."""
         return self._max_speed
+
+    def trajectory_add(self, position):
+        now = time.time()
+        x = position[0]
+        y = position[1]
+        self.positions.append((x, y, now))
+        self._cleanup(now)
+
+    def _cleanup(self, now):
+        self.positions = [(x, y, t) for (x, y, t) in self.positions
+                          if now - t <= self.window_seconds
+                          ]
+
+    def get_trajectory_count(self):
+        return self.positions
 
     def summary(self, scoreboard: ScoreBoard) -> str:
         """Gibt eine formatierte Zusammenfassung zurück."""
@@ -114,3 +129,4 @@ class Statistics:
         self._speed_samples.clear()
         self._max_speed = 0.0
         self._frame_count = 0
+        self.positions.clear()
