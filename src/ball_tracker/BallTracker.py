@@ -174,6 +174,8 @@ class BallTracker:
         self.hsv_trackbar()
         cv2.namedWindow("Original")
         cv2.namedWindow("Mask")
+
+        cv2.waitKey(100) # damit Trackbars initialisiert werden können
         
         while True:
             # Frame lesen
