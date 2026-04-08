@@ -74,7 +74,15 @@ class BallTracker:
 
         # 4. Größte Kontur = Ball
         largest = max(contours, key=cv2.contourArea)
-        ((cx, cy), radius) = cv2.minEnclosingCircle(largest)
+        M = cv2.moments(largest)    #berechne Schwerpunkt um blur-robust zu sein
+        if M["m00"] == 0:
+            self.position = None
+            return None
+        cx = int(M["m10"] / M["m00"])
+        cy = int(M["m01"] / M["m00"])
+        area = cv2.contourArea(largest)
+        radius = (area / np.pi) ** 0.5
+
 
         # Mindestgröße um Rauschen auszuschließen
         if radius < 2:
