@@ -6,11 +6,11 @@ import numpy as np
 
 
 class SnapshotManager:
-    """Verwaltet das Speichern von Tor-Snapshots."""
+    """Manages saving goal snapshots."""
     
     def __init__(self, snapshot_dir: str = "../snapshots"):
         """
-        :param snapshot_dir: Verzeichnis für Tor-Snapshots
+        :param snapshot_dir: Directory for goal snapshots
         """
         self.snapshot_dir = snapshot_dir
         os.makedirs(self.snapshot_dir, exist_ok=True)
@@ -18,11 +18,11 @@ class SnapshotManager:
     
     def save_snapshot(self, frame: np.ndarray, team: str, scoreboard) -> None:
         """
-        Speichert einen Snapshot des aktuellen Frames.
+        Saves a snapshot of the current frame.
         
-        :param frame: Der zu speichernde Frame (bereits mit Trajektorie gezeichnet)
-        :param team: Name des Teams, das getroffen hat
-        :param scoreboard: ScoreBoard-Instanz für den aktuellen Spielstand
+        :param frame: The frame to save (already drawn with trajectory)
+        :param team: Name of the team that scored
+        :param scoreboard: ScoreBoard instance for the current score
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         score = scoreboard.get_score_string().replace(" : ", "-")

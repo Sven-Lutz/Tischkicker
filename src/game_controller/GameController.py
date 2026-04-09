@@ -31,11 +31,11 @@ class GameController:
 
     ):
         """
-        :param camera_source: Kamera-Index oder Videopfad
-        :param team_names:    Namen der beiden Teams
-        :param cm_per_pixel:  Pixel→cm Umrechnungsfaktor
-        :param goals_to_win:  Tore bis zum Spielende
-        :param snapshot_dir:  Verzeichnis für Tor-Snapshots
+        :param camera_source: Camera index or video path
+        :param team_names: Names of the two teams
+        :param cm_per_pixel: Pixel-to-centimeter conversion factor
+        :param goals_to_win: Goals required to end the game
+        :param snapshot_dir: Directory for goal snapshots
         """
         self.goals_to_win = goals_to_win
         self.state = self.STATE_IDLE
@@ -53,7 +53,7 @@ class GameController:
         self.event_handler = EventHandler(game_controller=self)
 
     def start(self) -> None:
-        """Startet das System: Kamera öffnen → kalibrieren → Spiel-Loop."""
+        """Starts the system: open camera → calibrate → game loop."""
         logging.info("[game_controller] Starte System …")
 
         if not self.camera.start():
@@ -69,11 +69,11 @@ class GameController:
         self._shutdown()
 
     def stop(self) -> None:
-        """Beendet den Spiel-Loop von außen ."""
+        """Stops the game loop from the outside."""
         self.state = self.STATE_FINISHED
 
     def _run_calibration(self) -> None:
-        """Kalibrierungsphase: HSV-Werte und Tor-Zonen interaktiv festlegen."""
+        """Calibration phase: interactively set HSV values and goal zones."""
         self.state = self.STATE_CALIBRATING
 
         # 1. HSV-Kalibrierung
@@ -95,7 +95,7 @@ class GameController:
         logging.info("[game_controller] Kalibrierung fertig – Spiel startet!")
 
     def _run_game_loop(self) -> None:
-        """Haupt-Loop: Frame lesen → tracken → prüfen → anzeigen."""
+        """Main loop: read frame → track → check → display."""
         print(f"[game_controller] Spiel läuft. Tasten: [p] Pause  [r] Reset  [q] Beenden")
 
         while self.state in (self.STATE_RUNNING, self.STATE_PAUSED):
@@ -113,7 +113,7 @@ class GameController:
             self.event_handler.handle_key_press(cv2.waitKey(1) & 0xFF)
 
     def _process_frame(self, frame: np.ndarray) -> None:
-        """Führt Tracking, Tor-Check und Statistik für einen einzelnen Frame durch."""
+        """Performs tracking, goal checking, and statistics for a single frame."""
         # 1. Ball tracken
         ball_pos = self.ball_tracker.update(frame)
         self.ball_tracker.draw(frame)
@@ -145,7 +145,7 @@ class GameController:
                 return
 
     def _shutdown(self) -> None:
-        """Gibt alle Ressourcen frei und zeigt die Zusammenfassung."""
+        """Releases all resources and prints the summary."""
         print("\n" + self.statistics.summary(self.scoreboard))
         self.camera.stop()
         cv2.destroyAllWindows()

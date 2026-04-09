@@ -3,10 +3,10 @@ import numpy as np
 
 
 class HUDRenderer:
-    """Rendert das Head-Up-Display (HUD) mit Spielstand, Geschwindigkeit und Status."""
+    """Renders the head-up display (HUD) with score, speed, and status."""
     
     def __init__(self):
-        """Initialisiert den HUD-Renderer."""
+        """Initializes the HUD renderer."""
         pass
     
     def render_hud(
@@ -18,13 +18,13 @@ class HUDRenderer:
         state: str
     ) -> None:
         """
-        Rendert Spielstand, Geschwindigkeit und Status ins Bild.
+        Renders score, speed, and status into the image.
         
-        :param frame: Das Bild, in das gerendert werden soll
-        :param scoreboard: ScoreBoard-Instanz
-        :param statistics: Statistics-Instanz
-        :param ball_tracker: BallTracker-Instanz
-        :param state: Aktueller Spielzustand (z.B. "RUNNING", "PAUSED")
+        :param frame: The image to render into
+        :param scoreboard: ScoreBoard-Instance
+        :param statistics: Statistics-Instance
+        :param ball_tracker: BallTracker-Instance
+        :param state: Current game state (e.g. "RUNNING", "PAUSED")
         """
         h, w = frame.shape[:2]
 
@@ -54,10 +54,10 @@ class HUDRenderer:
     
     def draw_trajectory(self, frame: np.ndarray, trajectory: list) -> None:
         """
-        Zeichnet die Trajektorie der letzten Sekunden.
+        Draws the trajectory of the last few seconds.
         
-        :param frame: Das Bild, in das gezeichnet werden soll
-        :param trajectory: Liste von Positionen [(x, y, timestamp), ...]
+        :param frame: The image to draw into
+        :param trajectory: List of positions
         """
         if len(trajectory) < 2:
             return

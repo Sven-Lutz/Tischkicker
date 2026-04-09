@@ -10,14 +10,13 @@ def nothing(x):
 
 class BallTracker:
     """
-    Erkennt und trackt den Ball per Farb-Segmentierung in jedem Frame.
-    Berechnet Position, Geschwindigkeit
+    Detects and tracks ball based on color in HSV space. Calculates position and speed.
     """
 
     def __init__(self, fps: float = 30.0, cm_per_pixel: float = 0.1):
         """
-        :param fps:           Frames pro Sekunde der Kamera (für Geschwindigkeitsberechnung)
-        :param cm_per_pixel:  Umrechnungsfaktor Pixel → Zentimeter (nach Kalibrierung setzen)
+        :param fps:           Frames per second for velocity
+        :param cm_per_pixel:  conversion factor pixels to centimeters
         """
         self.fps = fps
         self.cm_per_pixel = cm_per_pixel
@@ -48,10 +47,10 @@ class BallTracker:
 
     def update(self, frame: np.ndarray) -> tuple[int, int] | None:
         """
-        Verarbeitet einen Frame, erkennt den Ball und aktualisiert Position + Geschwindigkeit.
+        Process frame, detects ball and updates position and velocity accordingly.
 
-        :param frame: BGR-Frame von der Kamera
-        :return:      Erkannte Ball-Position (x, y) oder None
+        :param frame: frame from camera
+        :return:      position of ball
         """
         self._prev_position = self.position
 
@@ -84,7 +83,7 @@ class BallTracker:
         radius = (area / np.pi) ** 0.5
 
 
-        # Mindestgröße um Rauschen auszuschließen
+        # Mindestgröße
         if radius < 2:
             self.position = None
             return None
@@ -92,7 +91,7 @@ class BallTracker:
         self.position = (int(cx), int(cy))
         self.radius = int(radius)
 
-        # 5. Geschwindigkeit berechnen
+        # 5. Geschwindigkeit
         self._update_speed()
 
         return self.position
@@ -118,18 +117,18 @@ class BallTracker:
 
 
     def average_speed_cm_s(self) -> float:
-        """Gibt die Durchschnittsgeschwindigkeit über alle bisher gespeicherten Frames zurück."""
+        """Returns the average speed across all stored frames so far."""
         if not self._speed_history:
             return 0.0
         return sum(self._speed_history) / len(self._speed_history)
 
     def reset_speed_history(self) -> None:
-        """Setzt die Geschwindigkeits-Historie zurück (z.B. nach einem Tor)."""
+        """Resets the speed history."""
         self._speed_history.clear()
 
 
     def draw(self, frame: np.ndarray) -> None:
-        """Zeichnet Ball-Position und Geschwindigkeit in den Frame."""
+        """Draws ball position and velocity in frame."""
         if self.position is None:
             return
 
@@ -144,7 +143,7 @@ class BallTracker:
 
 
     def hsv_trackbar(self) -> None:
-        """Erstellt Trackbars zum interaktiven Einstellen der HSV-Werte."""
+        """Trackbar to choose HSV values."""
         cv2.namedWindow("HSV Settings")
         cv2.resizeWindow("HSV Settings", 400, 300)
 
@@ -157,7 +156,7 @@ class BallTracker:
         cv2.createTrackbar("V_Max", "HSV Settings", int(self.hsv_upper[2]), 255, nothing)
 
     def update_hsv_from_trackbar(self) -> None:
-        """Liest die aktuellen Trackbar-Werte aus und aktualisiert hsv_lower/hsv_upper."""
+        """Reads current HSV settings from trackbar."""
         try:
             h_min = cv2.getTrackbarPos("H_Min", "HSV Settings")
             h_max = cv2.getTrackbarPos("H_Max", "HSV Settings")
@@ -173,19 +172,19 @@ class BallTracker:
 
     def calibrate_hsv_interactive(self, camera) -> None:
         """
-        Interaktive HSV-Kalibrierung mit Live-Vorschau der Maske.
+        Interactive calibration procedure.
         
-        :param camera: Camera-Objekt zum Abrufen von Frames
+        :param camera: camera object.
         """
         print("[BallTracker] HSV-Kalibrierung gestartet. Drücke 'q' zum Beenden.")
         
-        # Trackbars erstellen
+        # Trackbars
         self.hsv_trackbar()
         cv2.namedWindow("Original")
         cv2.namedWindow("Mask")
 
-        cv2.waitKey(100) # damit Trackbars initialisiert werden können
-        
+        cv2.waitKey(100) # initialize Trackbars
+
         while True:
             # Frame lesen
             ok, frame = camera.read_frame()

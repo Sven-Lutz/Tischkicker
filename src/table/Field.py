@@ -6,16 +6,16 @@ import numpy as np
 
 class GoalZone:
     """
-
+    Represents a goal area on the table.
     """
 
     COOLDOWN_FRAMES = 30  #Cooldown zwischen Torzählungen
 
     def __init__(self, name: str, x: int, y: int, w: int, h: int):
         """
-        :param name:
-        :param x, y:
-        :param w, h:
+        :param name: Goal name
+        :param x, y: Top-left corner of the zone
+        :param w, h: Width and height of the zone
         """
         self.name = name
         self.x = x
@@ -30,17 +30,17 @@ class GoalZone:
     # ------------------------------------------------------------------
 
     def contains_point(self, point: tuple[int, int]) -> bool:
-        """Gibt True zurück, wenn der Punkt innerhalb der Tor-Box liegt."""
+        """Returns True if the point lies within the goal box."""
         px, py = point
         return self.x <= px <= self.x + self.w and self.y <= py <= self.y + self.h
 
     def check_goal(self, ball_center: tuple[int, int] | None) -> bool:
         """
-        Prüft ob gerade ein Tor erzielt wurde.
-        Berücksichtigt Cooldown und State-Tracking (kein Spam-Zählen).
+        Checks whether a goal was scored in this frame.
+        Uses cooldown and state tracking to avoid duplicate scoring.
 
-        :param ball_center: (x, y) Mittelpunkt des Balls, oder None wenn nicht sichtbar
-        :return: True genau dann wenn in diesem Frame ein neues Tor gewertet wird
+        :param ball_center: (x, y) center of the ball, or None if not visible
+        :return: True exactly when a new goal is counted in this frame
         """
         # Cooldown herunterzählen
         if self._cooldown_counter > 0:
@@ -68,7 +68,7 @@ class GoalZone:
     # ------------------------------------------------------------------
 
     def draw(self, frame: np.ndarray, color: tuple = (0, 0, 255)) -> None:
-        """Zeichnet die Tor-Zone in den Frame."""
+        """Draws the goal zone onto the frame."""
         cv2.rectangle(frame, (self.x, self.y), (self.x + self.w, self.y + self.h), color, 2)
         cv2.putText(frame, f"Tor {self.name}", (self.x, self.y - 6),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
@@ -79,8 +79,8 @@ class GoalZone:
 
 class Field:
     """
-    Repräsentiert das Spielfeld.
-    Verwaltet die Kalibrierung und alle GoalZone-Objekte.
+    Represents the playing field.
+    Manages calibration and all GoalZone objects.
     """
 
     def __init__(self):
@@ -95,13 +95,13 @@ class Field:
     # ------------------------------------------------------------------
 
     def add_goal_zone(self, name: str, x: int, y: int, w: int, h: int) -> None:
-        """Fügt eine GoalZone hinzu."""
+        """Adds a GoalZone."""
         self.goal_zones.append(GoalZone(name, x, y, w, h))
 
     def calibrate_interactive(self, frame: np.ndarray, window_name: str = "Kalibrierung") -> None:
         """
-        User klickt je 2 Punkte pro Tor (obere-links, untere-rechts).
-        Beendet sich wenn alle Tore kalibriert sind.
+        The user clicks two points per goal (top-left, bottom-right).
+        Ends once all goals have been calibrated.
         """
         goal_names = ["Links", "Rechts"]
         self._click_points = []
@@ -144,7 +144,7 @@ class Field:
 
     def check_goals(self, ball_center: tuple[int, int] | None) -> list[str]:
         """
-        Prüft alle Torzonen. Gibt Liste der Namen der Tore zurück, die in diesem Frame erzielt wurden.
+        Checks all goal zones and returns the names of the goals scored in this frame.
         """
         scored = []
         for gz in self.goal_zones:
@@ -157,6 +157,6 @@ class Field:
     # ------------------------------------------------------------------
 
     def draw(self, frame: np.ndarray) -> None:
-        """Zeichnet Torzonen in den Frame."""
+        """Draws all goal zones onto the frame."""
         for gz in self.goal_zones:
             gz.draw(frame)

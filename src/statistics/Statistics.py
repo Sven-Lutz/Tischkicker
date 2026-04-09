@@ -5,7 +5,7 @@ import time
 
 @dataclass
 class GoalEvent:
-    """Speichert ein einzelnes Tor-Ereignis."""
+    """Stores a single goal event."""
     team: str
     timestamp: datetime = field(default_factory=datetime.now)
     ball_speed_cm_s: float = 0.0
@@ -13,12 +13,12 @@ class GoalEvent:
 
 class ScoreBoard:
     """
-    Verwaltet den Spielstand und die Tor-Historie.
+    Manages the score and goal history.
     """
 
     def __init__(self, team_names: tuple[str, str] = ("Links", "Rechts")):
         """
-        :param team_names: Namen der beiden Teams / Seiten
+        :param team_names: Names of the two teams / sides
         """
         self.team_names = team_names
         self._scores: dict[str, int] = {name: 0 for name in team_names}
@@ -26,10 +26,10 @@ class ScoreBoard:
 
     def register_goal(self, team: str, ball_speed: float = 0.0) -> None:
         """
-        Zählt ein Tor für das angegebene Team.
+        Records a goal for the specified team.
 
-        :param team:       Team-Name (muss in team_names vorkommen)
-        :param ball_speed: Geschwindigkeit des Balls beim Tor (cm/s)
+        :param team: Team name (must exist in team_names)
+        :param ball_speed: Ball speed at the time of the goal (cm/s)
         """
         if team not in self._scores:
             print(f"[ScoreBoard] Unbekanntes Team: {team}")
@@ -44,12 +44,12 @@ class ScoreBoard:
         return self._scores.get(team, 0)
 
     def get_score_string(self) -> str:
-        """Gibt den Spielstand als lesbaren String zurück, z.B. '3 : 2'."""
+        """Returns the score as a readable string, e.g. '3 : 2'."""
         a, b = self.team_names
         return f"{self._scores[a]} : {self._scores[b]}"
 
     def reset(self) -> None:
-        """Setzt den Spielstand zurück."""
+        """Resets the score."""
         for name in self.team_names:
             self._scores[name] = 0
         self._goal_events.clear()
@@ -62,7 +62,7 @@ class ScoreBoard:
 
 class Statistics:
     """
-    Sammelt und berechnet Spielstatistiken.
+    Collects and computes game statistics.
     """
 
     def __init__(self):
@@ -73,7 +73,7 @@ class Statistics:
         self.window_seconds: int = 5
 
     def record_speed(self, speed_cm_s: float) -> None:
-        """Nimmt eine Geschwindigkeits-Messung auf."""
+        """Records a speed measurement."""
         if speed_cm_s <= 0:
             return
         self._speed_samples.append(speed_cm_s)
@@ -82,13 +82,13 @@ class Statistics:
         self._frame_count += 1
 
     def average_speed(self) -> float:
-        """Durchschnittsgeschwindigkeit über das gesamte Spiel."""
+        """Average speed over the entire game."""
         if not self._speed_samples:
             return 0.0
         return sum(self._speed_samples) / len(self._speed_samples)
 
     def max_speed(self) -> float:
-        """Maximale gemessene Geschwindigkeit."""
+        """Maximum recorded speed."""
         return self._max_speed
 
     def trajectory_add(self, position):
@@ -107,7 +107,7 @@ class Statistics:
         return self.positions
 
     def summary(self, scoreboard: ScoreBoard) -> str:
-        """Gibt eine formatierte Zusammenfassung zurück."""
+        """Returns a formatted summary."""
         lines = [
             "=" * 40,
             "         SPIEL-ZUSAMMENFASSUNG",

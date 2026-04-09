@@ -3,21 +3,21 @@ import numpy as np
 
 
 class EventHandler:
-    """Verarbeitet Events wie Tastatur-Eingaben, Tore und Spielende."""
+    """Handles events such as key input, goals, and game over."""
     
     def __init__(self, game_controller):
         """
-        :param game_controller: Referenz auf die GameController-Instanz
+        :param game_controller: Reference to the GameController instance
         """
         self.game_controller = game_controller
         logging.info("[EventHandler] Event-Handler initialisiert.")
     
     def on_goal(self, team: str, frame: np.ndarray = None) -> None:
         """
-        Wird aufgerufen wenn ein Tor fällt.
+        Called when a goal is scored.
         
-        :param team: Name des Teams, das getroffen hat
-        :param frame: Aktueller Frame (für Snapshot)
+        :param team: Name of the team that scored
+        :param frame: Current frame (for snapshot creation)
         """
         gc = self.game_controller
         print(f"[EventHandler] TOR für {team}! Neuer Stand: {gc.scoreboard.get_score_string()}")
@@ -28,9 +28,9 @@ class EventHandler:
     
     def on_game_over(self, winner: str) -> None:
         """
-        Wird aufgerufen wenn ein Team gewonnen hat.
+        Called when a team has won.
         
-        :param winner: Name des Gewinnerteams
+        :param winner: Name of the winning team
         """
         gc = self.game_controller
         print(f"\n[EventHandler] Spiel vorbei! Gewinner: {winner}")
@@ -39,9 +39,9 @@ class EventHandler:
     
     def handle_key_press(self, key: int) -> None:
         """
-        Verarbeitet Tastatur-Eingaben.
+        Handles keyboard input.
         
-        :param key: Gedrückte Taste (von cv2.waitKey())
+        :param key: Pressed key (from cv2.waitKey())
         """
         gc = self.game_controller
         

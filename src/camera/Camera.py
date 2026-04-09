@@ -7,12 +7,12 @@ import cv2
 
 class Camera:
     """
-    Verwaltet den Kamera-Feed und stellt Frames bereit.
+    Manages the camera feed and provides frames.
     """
 
     def __init__(self, source: int = 0):
         """
-        :param source: Kamera-Index (0 = Standard-Webcam) oder Videopfad
+        :param source: Camera index (0 = default webcam) or video path
         """
         self.source = source
         self.cap: cv2.VideoCapture | None = None
@@ -21,7 +21,7 @@ class Camera:
         self.frame_height: int = 0
 
     def start(self) -> bool:
-        """Öffnet den Kamera-Stream. Gibt True zurück wenn erfolgreich."""
+        """Opens the camera stream. Returns True if successful."""
         self.cap = cv2.VideoCapture(self.source)
         if not self.cap.isOpened():
             logging.error(f"[Camera] Fehler: Kamera {self.source} konnte nicht geöffnet werden.")
@@ -35,7 +35,7 @@ class Camera:
 
     def read_frame(self):
         """
-        Liest einen Frame vom Stream.
+        Reads a frame from the stream.
         :return: (success: bool, frame: np.ndarray | None)
         """
         if self.cap is None:
@@ -43,7 +43,7 @@ class Camera:
         return self.cap.read()
 
     def stop(self):
-        """Gibt die Kamera-Ressource frei."""
+        """Releases the camera resource."""
         if self.cap:
             self.cap.release()
             self.cap = None
