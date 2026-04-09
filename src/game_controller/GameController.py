@@ -130,7 +130,7 @@ class GameController:
         
         # 5. Trajektorie zeichnen
         trajectory = self.statistics.get_trajectory_count()
-        self.hud_renderer.draw_trajectory(frame, trajectory)
+        self.hud_renderer.draw_trajectory_gradient(frame, trajectory)
 
         # 6. Tor-Check
         scored_goals = self.field.check_goals(ball_pos)

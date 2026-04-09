@@ -51,7 +51,19 @@ class HUDRenderer:
         if state == "PAUSED":
             cv2.putText(frame, "⏸ PAUSE", (w // 2 - 60, h // 2),
                         cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 255, 255), 3)
-    
+
+    @staticmethod
+    def _trajectory_color(progress: float) -> tuple[int, int, int]:
+        """
+        Returns a BGR color for a trajectory segment.
+
+        progress is expected to be in the range [0.0, 1.0], where 0.0 is the
+        oldest segment (yellow) and 1.0 is the newest segment (red).
+        """
+        progress = max(0.0, min(1.0, progress))
+        green = int(255 * (1.0 - progress))
+        return 0, green, 255
+
     def draw_trajectory(self, frame: np.ndarray, trajectory: list) -> None:
         """
         Draws the trajectory of the last few seconds.
@@ -61,9 +73,23 @@ class HUDRenderer:
         """
         if len(trajectory) < 2:
             return
-        
+
+        self.draw_trajectory_gradient(frame, trajectory)
+
+    def draw_trajectory_gradient(self, frame: np.ndarray, trajectory: list) -> None:
+        """
+        Draws the trajectory of the last few seconds using a color gradient.
+
+        :param frame: The image to draw into
+        :param trajectory: List of positions
+        """
+        if len(trajectory) < 2:
+            return
+
+        segment_count = len(trajectory) - 1
         for i in range(1, len(trajectory)):
-            # Extrahiere nur x,y Position
-            p1 = (int(trajectory[i-1][0]), int(trajectory[i-1][1]))
+            progress = 1.0 if segment_count == 1 else (i - 1) / (segment_count - 1)
+            p1 = (int(trajectory[i - 1][0]), int(trajectory[i - 1][1]))
             p2 = (int(trajectory[i][0]), int(trajectory[i][1]))
-            cv2.line(frame, p1, p2, (255, 0, 0), 2)
+            color = self._trajectory_color(progress)
+            cv2.line(frame, p1, p2, color, 2)
