@@ -22,7 +22,7 @@ class GoalZone:
         self.y = y
         self.w = w
         self.h = h
-        self._cooldown_counter: int = 0  # Frames seit letztem Tor
+        self._cooldown_counter: int = 0
         self._ball_was_inside: bool = False
 
     # ------------------------------------------------------------------
@@ -63,10 +63,6 @@ class GoalZone:
         self._ball_was_inside = inside
         return is_new_goal
 
-    # ------------------------------------------------------------------
-    # Visualisierung
-    # ------------------------------------------------------------------
-
     def draw(self, frame: np.ndarray, color: tuple = (0, 0, 255)) -> None:
         """Draws the goal zone onto the frame."""
         cv2.rectangle(frame, (self.x, self.y), (self.x + self.w, self.y + self.h), color, 2)
@@ -74,89 +70,142 @@ class GoalZone:
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
 
-# ---------------------------------------------------------------------------
-
-
 class Field:
     """
     Represents the playing field.
     Manages calibration and all GoalZone objects.
     """
+    GOAL_DEPTH_RATIO  = 0.04
+    GOAL_HEIGHT_RATIO = 0.30
 
     def __init__(self):
         self.goal_zones: list[GoalZone] = []
+        self.corners: list[tuple[int, int]] = []   # 4 Ecken
         self._calibrated: bool = False
-        # Klick-Puffer für interaktive Kalibrierung
-        self._click_points: list[tuple[int, int]] = []
-        self._current_goal_name: str = ""
-
-    # ------------------------------------------------------------------
-    # Kalibrierung
-    # ------------------------------------------------------------------
-
-    def add_goal_zone(self, name: str, x: int, y: int, w: int, h: int) -> None:
-        """Adds a GoalZone."""
-        self.goal_zones.append(GoalZone(name, x, y, w, h))
+        self._click_buffer: list[tuple[int, int]] = []
 
     def calibrate_interactive(self, frame: np.ndarray, window_name: str = "Kalibrierung") -> None:
         """
-        The user clicks two points per goal (top-left, bottom-right).
+        The user calibrates four points for field (top-left, bottom-right).
         Ends once all goals have been calibrated.
         """
-        goal_names = ["Links", "Rechts"]
-        self._click_points = []
+        self._click_buffer = []
 
         def on_mouse(event, x, y, flags, param):
-            if event == cv2.EVENT_LBUTTONDOWN:
-                self._click_points.append((x, y))
-                print(f"[Field] Klick {len(self._click_points)}: ({x}, {y})")
+            if event == cv2.EVENT_LBUTTONDOWN and len(self._click_buffer) < 4:
+                self._click_buffer.append((x, y))
+                print(f"[Field] Ecke {len(self._click_buffer)}/4: ({x}, {y})")
 
         cv2.namedWindow(window_name)
         cv2.setMouseCallback(window_name, on_mouse)
 
-        for goal_name in goal_names:
-            self._click_points = []
-            print(f"\n[Field] Kalibrierung '{goal_name}': Klicke obere-links, dann untere-rechts Ecke des Tors.")
+        while len(self._click_buffer) < 4:
+            display = frame.copy()
 
-            while len(self._click_points) < 2:
-                display = frame.copy()
-                cv2.putText(display, f"Tor '{goal_name}': 2 Ecken klicken ({len(self._click_points)}/2)",
-                            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
-                # Vorherige Zonen schon einzeichnen
-                for gz in self.goal_zones:
-                    gz.draw(display)
-                cv2.imshow(window_name, display)
-                cv2.waitKey(30)
+            # Bereits geklickte Ecken einzeichnen
+            for i, pt in enumerate(self._click_buffer):
+                cv2.circle(display, pt, 6, (0, 255, 255), -1)
+                cv2.putText(display, str(i + 1), (pt[0] + 8, pt[1] - 8),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 5)
 
-            x1, y1 = self._click_points[0]
-            x2, y2 = self._click_points[1]
-            self.add_goal_zone(goal_name, min(x1, x2), min(y1, y2),
-                               abs(x2 - x1), abs(y2 - y1))
-            print(f"[Field] Tor '{goal_name}' kalibriert.")
+            # Verbindungslinien der bisher geklickten Punkte
+            if len(self._click_buffer) >= 2:
+                for i in range(len(self._click_buffer) - 1):
+                    cv2.line(display, self._click_buffer[i], self._click_buffer[i + 1],
+                             (0, 255, 255), 7)
 
-        cv2.destroyWindow(window_name)
+            cv2.imshow(window_name, display)
+            cv2.waitKey(30)
+
+        self.corners = self._click_buffer.copy()
+        self._compute_goal_zones()
         self._calibrated = True
+
+        # Vorschau der berechneten Torzonen anzeigen
+        self._show_calibration_result(frame.copy(), window_name)
         print("[Field] Kalibrierung abgeschlossen.")
 
+    def _compute_goal_zones(self) -> None:
+        """
+        Berechnet die zwei Torzonen automatisch aus den 4 Ecken.
+
+        Ecken-Reihenfolge (Uhrzeigersinn):
+          0: oben-links   1: oben-rechts
+          3: unten-links  2: unten-rechts
+
+        Linkes Tor:  Mitte zwischen Ecke 0 und 3 (linker Rand)
+        Rechtes Tor: Mitte zwischen Ecke 1 und 2 (rechter Rand)
+        """
+        tl, tr, br, bl = self.corners  # top-left, top-right, bottom-right, bottom-left
+
+        # Spielfeldmaße schätzen (Pixel)
+        field_width  = int(((tr[0] - tl[0]) + (br[0] - bl[0])) / 2)
+        field_height = int(((bl[1] - tl[1]) + (br[1] - tr[1])) / 2)
+
+        goal_depth  = max(8, int(field_width  * self.GOAL_DEPTH_RATIO))
+        goal_height = max(20, int(field_height * self.GOAL_HEIGHT_RATIO))
+
+        # Mitte des linken Randes
+        left_mid_x = int((tl[0] + bl[0]) / 2)
+        left_mid_y = int((tl[1] + bl[1]) / 2)
+
+        # Mitte des rechten Randes
+        right_mid_x = int((tr[0] + br[0]) / 2)
+        right_mid_y = int((tr[1] + br[1]) / 2)
+
+        # GoalZone links: ragt nach links aus dem Spielfeld raus
+        gz_left = GoalZone(
+            name="Links",
+            x=left_mid_x - goal_depth,
+            y=left_mid_y - goal_height // 2,
+            w=goal_depth,
+            h=goal_height,
+        )
+
+        # GoalZone rechts: ragt nach rechts aus dem Spielfeld raus
+        gz_right = GoalZone(
+            name="Rechts",
+            x=right_mid_x,
+            y=right_mid_y - goal_height // 2,
+            w=goal_depth,
+            h=goal_height,
+        )
+
+        self.goal_zones = [gz_left, gz_right]
+
+        print(f"[Field] Tor Links:  x={gz_left.x}, y={gz_left.y}, "
+              f"w={gz_left.w}, h={gz_left.h}")
+        print(f"[Field] Tor Rechts: x={gz_right.x}, y={gz_right.y}, "
+              f"w={gz_right.w}, h={gz_right.h}")
+
+    def _show_calibration_result(self, frame: np.ndarray, window_name: str) -> None:
+        """Zeigt 2 Sekunden lang das Ergebnis der Kalibrierung."""
+        # Spielfeld-Polygon einzeichnen
+        pts = np.array(self.corners, dtype=np.int32)
+        cv2.polylines(frame, [pts], isClosed=True, color=(0, 255, 255), thickness=6)
+
+        # Torzonen einzeichnen
+        for gz in self.goal_zones:
+            gz.draw(frame)
+
+
     # ------------------------------------------------------------------
-    # Tor-Check (delegiert an GoalZones)
+    # Tor-Check
     # ------------------------------------------------------------------
 
     def check_goals(self, ball_center: tuple[int, int] | None) -> list[str]:
-        """
-        Checks all goal zones and returns the names of the goals scored in this frame.
-        """
-        scored = []
-        for gz in self.goal_zones:
-            if gz.check_goal(ball_center):
-                scored.append(gz.name)
-        return scored
+        """Gibt Namen aller Tore zurück die in diesem Frame erzielt wurden."""
+        return [gz.name for gz in self.goal_zones if gz.check_goal(ball_center)]
 
     # ------------------------------------------------------------------
     # Visualisierung
     # ------------------------------------------------------------------
 
     def draw(self, frame: np.ndarray) -> None:
-        """Draws all goal zones onto the frame."""
+        """Zeichnet Spielfeld-Umriss und alle Torzonen."""
+        if self.corners:
+            pts = np.array(self.corners, dtype=np.int32)
+            cv2.polylines(frame, [pts], isClosed=True, color=(0, 200, 200), thickness=5)
+
         for gz in self.goal_zones:
             gz.draw(frame)
