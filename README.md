@@ -72,15 +72,28 @@ Alle Live-Werte bleiben sichtbar, ergänzt um:
 
 ```
 EDV4_Tischkicker/
-├── src/
-│   ├──
-├── tests/
-│   └──
-├── docs/
-│   └── architecture.md
-├── .gitignore
-├── requirements.txt
-└── main.py
+src/
+ ├── ball_tracker/
+ │    ├── __init__.py
+ │    └── BallTracker.py
+ ├── camera/
+ │    ├── __init__.py
+ │    └── Camera.py
+ ├── game_controller/
+ │    ├── __init__.py
+ │    ├── EventHandler.py
+ │    ├── GameController.py
+ │    ├── HUDRenderer.py
+ │    ├── SnapshotManager.py
+ │    └── ScoreBoard.py
+ ├── statistics/
+ │    ├── __init__.py
+ │    └── Statistics.py
+ ├── table/
+ │    ├── __init__.py
+ │    └── field.py
+ ├── GameEvents.py
+ └── main.py
 ```
 
 ---
