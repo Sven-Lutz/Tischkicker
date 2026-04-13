@@ -42,7 +42,7 @@ def test_game_config_defaults():
     assert config.team_right_names == ["Rechts"]
     assert config.pixels_per_meter == 500.0
     assert config.fps == 30.0
-    assert config.camera_index == 0
+    assert config.camera_index == 1
 
 
 def test_team_enum_values():

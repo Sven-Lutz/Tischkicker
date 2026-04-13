@@ -69,7 +69,7 @@ class GameConfig:
     team_right_names: list[str] = field(default_factory=lambda: ["Rechts"])
     pixels_per_meter: float = 500.0
     fps: float = 30.0
-    camera_index: int = 0
+    camera_index: int = 1
     field_x1: int = 0
     field_y1: int = 0
     field_x2: int = 640
