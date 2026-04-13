@@ -47,11 +47,19 @@ class VideoSource:
 
     @property
     def frame_width(self) -> int:
-        return self._width
+        """Actual frame width reported by the capture device (falls back to requested width)."""
+        with self._lock:
+            if self._cap is not None and self._cap.isOpened():
+                return int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            return self._width
 
     @property
     def frame_height(self) -> int:
-        return self._height
+        """Actual frame height reported by the capture device (falls back to requested height)."""
+        with self._lock:
+            if self._cap is not None and self._cap.isOpened():
+                return int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            return self._height
 
 
 class MockVideoSource(VideoSource):
