@@ -1,6 +1,7 @@
-"""Ball detection via HSV colour filtering.
+"""Ball detection using Background Subtraction (MOG2) and shape heuristics.
 
-Default profile: white ball on dark green (H 0–180, S 0–50, V 170–255).
+Instead of static colour filtering, this module detects moving objects
+and identifies the ball based on its expected pixel area and aspect ratio.
 Supply a field mask via set_field_mask() to restrict the search area.
 """
 
@@ -19,18 +20,22 @@ logger = logging.getLogger(__name__)
 
 
 class BallDetector:
-    DEFAULT_HSV_LOWER = np.array([0, 0, 170], dtype=np.uint8)
-    DEFAULT_HSV_UPPER = np.array([180, 50, 255], dtype=np.uint8)
-
-    MIN_RADIUS = 6
-    MAX_RADIUS = 45
-    MIN_CIRCULARITY = 0.65
+    # Heuristics for ball detection (tune these based on your video resolution)
+    MIN_AREA = 30.0
+    MAX_AREA = 800.0
+    MIN_ASPECT_RATIO = 0.5   # Allows for motion blur elongation
+    MAX_ASPECT_RATIO = 2.5
 
     def __init__(self) -> None:
-        self._hsv_lower = self.DEFAULT_HSV_LOWER.copy()
-        self._hsv_upper = self.DEFAULT_HSV_UPPER.copy()
+        # Initialize the background subtractor
+        # history: length of the history (frames)
+        # varThreshold: distance threshold for pixel-background matching
+        self._back_sub = cv2.createBackgroundSubtractorMOG2(
+            history=500, varThreshold=50, detectShadows=False
+        )
         self._kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         self._field_mask: Optional[np.ndarray] = None
+        logger.debug("BallDetector initialized with MOG2 background subtraction.")
 
     def set_field_mask(self, mask: np.ndarray) -> None:
         """Restrict detection to pixels where *mask* is non-zero."""
@@ -42,61 +47,64 @@ class BallDetector:
         self._field_mask = None
         logger.debug("Field mask cleared.")
 
-    def update_hsv_range(self, lower: np.ndarray, upper: np.ndarray) -> None:
-        """Override HSV thresholds used for colour filtering."""
-        self._hsv_lower = lower.astype(np.uint8)
-        self._hsv_upper = upper.astype(np.uint8)
-        logger.debug("HSV range updated: lower=%s upper=%s", lower, upper)
-
     def detect(self, frame: np.ndarray) -> Optional[BallPosition]:
-        """Return the ball position in *frame*, or None if not found."""
-        blurred = cv2.GaussianBlur(frame, (7, 7), 0)
-        hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
+        """Return the ball position in *frame* based on movement, or None if not found."""
+        roi = frame
 
-        colour_mask = cv2.inRange(hsv, self._hsv_lower, self._hsv_upper)
-
+        # 1. Restrict search area to the table to save processing power and avoid noise
         if self._field_mask is not None:
-            if self._field_mask.shape != colour_mask.shape:
+            if self._field_mask.shape != frame.shape[:2]:
                 self._field_mask = cv2.resize(
                     self._field_mask,
-                    (colour_mask.shape[1], colour_mask.shape[0]),
+                    (frame.shape[1], frame.shape[0]),
                     interpolation=cv2.INTER_NEAREST,
                 )
-            colour_mask = cv2.bitwise_and(colour_mask, self._field_mask)
+            roi = cv2.bitwise_and(frame, frame, mask=self._field_mask)
 
-        # Close fills holes in the ball silhouette; open removes speckles.
-        cleaned = cv2.morphologyEx(colour_mask, cv2.MORPH_CLOSE, self._kernel)
-        cleaned = cv2.morphologyEx(cleaned, cv2.MORPH_OPEN, self._kernel)
+        # 2. Extract foreground (moving objects)
+        fg_mask = self._back_sub.apply(roi)
 
+        # 3. Clean up noise (morphological opening removes small speckles)
+        cleaned = cv2.morphologyEx(fg_mask, cv2.MORPH_OPEN, self._kernel)
+
+        # 4. Find contours of moving objects
         contours, _ = cv2.findContours(
             cleaned, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
-        best = self._pick_best_contour(contours)
-        if best is None:
+
+        best_contour = self._pick_best_contour(contours)
+        if best_contour is None:
             return None
 
-        (cx, cy), _ = cv2.minEnclosingCircle(best)
-        return BallPosition(x=float(cx), y=float(cy), timestamp=time.time())
+        # 5. Calculate the center of mass using moments
+        moments = cv2.moments(best_contour)
+        if moments["m00"] > 0:
+            cx = moments["m10"] / moments["m00"]
+            cy = moments["m01"] / moments["m00"]
+            return BallPosition(x=float(cx), y=float(cy), timestamp=time.time())
+
+        return None
 
     def _pick_best_contour(self, contours: tuple) -> Optional[np.ndarray]:
+        """Filter contours based on size and aspect ratio to distinguish ball from players."""
         best: Optional[np.ndarray] = None
         best_area = 0.0
 
         for c in contours:
             area = cv2.contourArea(c)
-            if area < 1:
+
+            # Filter 1: Size
+            if not (self.MIN_AREA <= area <= self.MAX_AREA):
                 continue
 
-            _, radius = cv2.minEnclosingCircle(c)
-            if not (self.MIN_RADIUS <= radius <= self.MAX_RADIUS):
+            x, y, w, h = cv2.boundingRect(c)
+            if h == 0:
                 continue
 
-            perimeter = cv2.arcLength(c, True)
-            if perimeter == 0:
-                continue
+            aspect_ratio = float(w) / float(h)
 
-            circularity = 4 * np.pi * area / (perimeter ** 2)
-            if circularity < self.MIN_CIRCULARITY:
+            # Filter 2: Aspect Ratio (Players are tall/thin, ball is square-ish or blurred)
+            if not (self.MIN_ASPECT_RATIO <= aspect_ratio <= self.MAX_ASPECT_RATIO):
                 continue
 
             if area > best_area:

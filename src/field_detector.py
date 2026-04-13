@@ -16,9 +16,9 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-# Broad green range — covers most felt colours under varying lighting.
-_FIELD_HSV_LOWER = np.array([30, 30, 25], dtype=np.uint8)
-_FIELD_HSV_UPPER = np.array([95, 255, 210], dtype=np.uint8)
+# Broad green range — adapted to be more lenient towards shadows/highlights.
+_FIELD_HSV_LOWER = np.array([35, 40, 40], dtype=np.uint8)
+_FIELD_HSV_UPPER = np.array([85, 255, 255], dtype=np.uint8)
 
 # Field must cover at least this fraction of the frame to be accepted.
 _MIN_FIELD_FRACTION = 0.10
@@ -60,6 +60,22 @@ class FieldBounds:
         cv2.fillPoly(mask, [pts], 255)
         return mask
 
+    def get_perspective_matrix(self, target_width: int, target_height: int) -> np.ndarray:
+        """Calculate the transformation matrix for the Bird's-Eye View."""
+        # Source points: The 4 detected corners of the table
+        src_pts = np.array(self.corners, dtype=np.float32)
+
+        # Destination points: A perfect rectangle starting at (0,0)
+        dst_pts = np.array([
+            [0, 0],  # Top-Left
+            [target_width - 1, 0],  # Top-Right
+            [target_width - 1, target_height - 1],  # Bottom-Right
+            [0, target_height - 1]  # Bottom-Left
+        ], dtype=np.float32)
+
+        # Calculate Homography matrix
+        matrix = cv2.getPerspectiveTransform(src_pts, dst_pts)
+        return matrix
 
 class FieldDetector:
     """Detects the green playing field in a single frame or a sequence of frames."""
@@ -73,6 +89,8 @@ class FieldDetector:
         hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
 
         mask = cv2.inRange(hsv, _FIELD_HSV_LOWER, _FIELD_HSV_UPPER)
+
+        # Morphological operations to fill holes and remove noise
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, self._kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, self._kernel)
 
@@ -94,8 +112,9 @@ class FieldDetector:
             )
             return None
 
-        peri = cv2.arcLength(largest, True)
-        approx = cv2.approxPolyDP(largest, 0.02 * peri, True)
+        # Polygon approximation to find the 4 corners of the table
+        perimeter = cv2.arcLength(largest, True)
+        approx = cv2.approxPolyDP(largest, 0.02 * perimeter, True)
 
         if len(approx) == 4:
             pts = _order_corners(approx.reshape(4, 2))
@@ -110,12 +129,12 @@ class FieldDetector:
                 x2=x2,
                 y2=y2,
             )
-            logger.debug("Quad fit: %s", bounds)
+            logger.debug("Quad fit successful: %s", bounds)
             return bounds
 
         x, y, w, h = cv2.boundingRect(largest)
         logger.debug(
-            "Bounding rect fallback: x=%d y=%d w=%d h=%d", x, y, w, h
+            "Bounding rect fallback used: x=%d y=%d w=%d h=%d", x, y, w, h
         )
         return FieldBounds.from_rect(x, y, w, h)
 
@@ -124,11 +143,7 @@ class FieldDetector:
         video_source,
         num_frames: int = 15,
     ) -> Optional[FieldBounds]:
-        """Sample *num_frames* frames and return the median field bounds.
-
-        Uses the median across all successful detections so that occasional
-        bad frames do not skew the result.
-        """
+        """Sample *num_frames* frames and return the median field bounds."""
         results: list[FieldBounds] = []
 
         for _ in range(num_frames):
@@ -148,6 +163,7 @@ class FieldDetector:
         if len(results) == 1:
             return results[0]
 
+        # Calculate the median coordinates to ignore outlier frames
         x1s = sorted(b.x1 for b in results)
         y1s = sorted(b.y1 for b in results)
         x2s = sorted(b.x2 for b in results)
@@ -156,6 +172,7 @@ class FieldDetector:
 
         x1, y1, x2, y2 = x1s[mid], y1s[mid], x2s[mid], y2s[mid]
         bounds = FieldBounds.from_rect(x1, y1, x2 - x1, y2 - y1)
+
         logger.info(
             "Field detected from %d/%d frames: x=%d–%d y=%d–%d",
             len(results),
